@@ -34,22 +34,52 @@ extern "C" {
     }
 
     __attribute__((visibility("default"))) __attribute__((used))
+    class ShapeDetector {
+        public:
+            string detectShape(std::vector<Point> contour){
+                string shape = "unidentified";
+                vector<Point> approx;
+                approxPolyDP(contour, approx, 0.04 * arcLength(contour, true), true);
+                platform_log("Number of vertices: %d\n", approx.size());
+
+                if(approx.size() == 3){
+                    shape = "triangle";
+                } else if(approx.size() == 4){
+                    shape = "square or rectangle";
+                } else if(approx.size() == 5){
+                    shape = "pentagon";
+                } else {
+                    shape = "circle";
+                }
+
+                return shape;
+            }
+    };
+
+    __attribute__((visibility("default"))) __attribute__((used))
     void process_image(char* inputImagePath, char* outputImagePath) {
         long long start = get_now();
-        
+
         Mat input = imread(inputImagePath, IMREAD_GRAYSCALE);
-        Mat threshed, withContours;
+        Mat threshed, withContours, blurred;
 
         vector<vector<Point>> contours;
         vector<Vec4i> hierarchy;
-        
-        adaptiveThreshold(input, threshed, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 77, 6);
-        findContours(threshed, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_L1);
-        
-        cvtColor(threshed, withContours, COLOR_GRAY2BGR);
-        drawContours(withContours, contours, -1, Scalar(0, 255, 0), 4);
-        
-        imwrite(outputImagePath, withContours);
+
+        // image preprocessing
+        GaussianBlur(input, blurred, Size(5, 5), 0);
+        threshold(blurred, threshed, 60, 255, THRESH_BINARY);
+        findContours(threshed, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+
+        drawContours(threshed, contours, -1, Scalar(0, 255, 0), 4);
+
+        ShapeDetector sd;
+        for(int i = 0; i < contours.size(); i++){
+            string shape = sd.detectShape(contours[i]);
+            platform_log("Shape: %s\n", shape.c_str());
+        }
+
+        imwrite(outputImagePath, threshed);
         
         int evalInMillis = static_cast<int>(get_now() - start);
         platform_log("Processing done in %dms\n", evalInMillis);
