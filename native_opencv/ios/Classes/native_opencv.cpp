@@ -52,8 +52,8 @@ extern "C" {
         vector<Point> largestContour;
         vector<Vec4i> hierarchy;
         RotatedRect rect;
-        vector<int> points;
-        //vector<int> intPoints;
+        vector<float> points;
+        vector<int> intPoints;
         int ddepth = CV_32F;
 
         Mat grad_x, grad_y;
@@ -91,12 +91,19 @@ extern "C" {
 
         rect = minAreaRect(largestContour);
 
+        // find and draw points for rectangle
+        // Point2f rectPoints[4];
+        // rect.points(rectPoints);
+        // Point2i intRectPoints[4];
+        // intRectPoints = static_cast<Point>(rectPoints);
+
+        // using boxPoints
         boxPoints(rect, points);
-
-        // transform box point values to integers
-        //intPoints(points.begin(), points.end());
-
-        drawContours(input, points, -1, Scalar(0, 255, 0), 3);
+        vector<int> intPoints(points.begin(), points.end());
+        // points.convertTo(intPoints, CV_8S);
+        transform(points.begin(), points.end(), intPoints.begin(), convertToInt);
+        
+        drawContours(input, intPoints, -1, Scalar(0, 255, 0), 3);
 
         imwrite(outputImagePath, input);
     }
