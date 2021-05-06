@@ -42,7 +42,7 @@ extern "C" {
 
     __attribute__((visibility("default"))) __attribute__((used))
     int convertToInt (float num){
-        return static_cast<int>(num);
+        return round(num);
     }
 
     __attribute__((visibility("default"))) __attribute__((used))
@@ -52,8 +52,10 @@ extern "C" {
         vector<Point> largestContour;
         vector<Vec4i> hierarchy;
         RotatedRect rect;
-        vector<float> points;
-        vector<int> intPoints;
+        // vector<float> points(4,0);
+        // vector<int> intPoints(4,0);
+        Mat points = Mat(4, 2, CV_32F);
+        Mat intPoints = Mat(4, 2, CV_32S);
         int ddepth = CV_32F;
 
         Mat grad_x, grad_y;
@@ -99,11 +101,18 @@ extern "C" {
 
         // using boxPoints
         boxPoints(rect, points);
-        vector<int> intPoints(points.begin(), points.end());
+        // platform_log("Rotated Rect Points(FLOAT):/n bottomLeft: %d/n, topLeft: %d/n, topRight :%d/n, bottomRight: %dn", points[0], points[1], points[2], points[3]);
+        // vector<int> intPoints(points.begin(), points.end());
         // points.convertTo(intPoints, CV_8S);
-        transform(points.begin(), points.end(), intPoints.begin(), convertToInt);
+        // transform(points.begin(), points.end(), intPoints.begin(), convertToInt);
+        // platform_log("Rotated Rect Points(INTEGER):/n bottomLeft: %d/n, topLeft: %d/n, topRight :%d/n, bottomRight: %dn", intPoints[0], intPoints[1], intPoints[2], intPoints[3]);
+        // Mat pointsMat = Mat(4, 2, CV_32SC1);
+        // pointsMat.push_back(intPoints);
+        Mat pointsMat = Mat(1, 2, CV_32S);
+        points.convertTo(intPoints, CV_32SC1);
+        pointsMat.push_back(intPoints);
         
-        drawContours(input, intPoints, -1, Scalar(0, 255, 0), 3);
+        drawContours(input, pointsMat, -1, Scalar(0, 255, 0), 3);
 
         imwrite(outputImagePath, input);
     }
