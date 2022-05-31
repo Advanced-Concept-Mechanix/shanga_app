@@ -34,22 +34,139 @@ extern "C" {
     }
 
     __attribute__((visibility("default"))) __attribute__((used))
+    bool compareContourAreas ( vector<Point> contour1, vector<Point> contour2 ) {
+        double i = fabs( contourArea(Mat(contour1)) );
+        double j = fabs( contourArea(Mat(contour2)) );
+        return ( i > j );
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used))
+    int convertToInt (float num){
+        return round(num);
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used))
+    void thresholdSegmentation(Mat input, Mat input_gray, char* outputImagePath){
+        Mat grad, threshed, blurred, kernel, closed;
+        vector<vector<Point>> contours;
+        vector<Point> largestContour;
+        vector<Vec4i> hierarchy;
+        RotatedRect rect;
+        // vector<float> points(4,0);
+        // vector<int> intPoints(4,0);
+        Mat points = Mat(4, 2, CV_32F);
+        Mat intPoints = Mat(4, 2, CV_32S);
+        int ddepth = CV_32F;
+
+        Mat grad_x, grad_y;
+        Mat abs_grad_x, abs_grad_y;
+        Sobel(input_gray, grad_x, ddepth, 1, 0, -1);
+        Sobel(input_gray, grad_y, ddepth, 0, 1, -1);
+        
+        // Convert output to a CV_8U image
+        convertScaleAbs(grad_x, abs_grad_x);
+        convertScaleAbs(grad_y, abs_grad_y);
+
+        //Gradient
+        addWeighted(abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad);
+
+        // blurring
+        blur(grad, blurred, Size(9, 9));
+
+        // Binary thresholding
+        threshold(blurred, threshed, 230, 255, THRESH_BINARY);
+
+        // get kernel for morphological operations
+        kernel = getStructuringElement(MORPH_RECT, Size(21, 7));
+
+        // closing morphological op
+        morphologyEx( threshed, closed, MORPH_CLOSE, kernel );
+
+        // find contours
+        findContours(closed, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+        //sort contours according to area
+        sort(contours.begin(), contours.end(), compareContourAreas);
+
+        // get largest contour
+        largestContour = contours[0];
+
+        rect = minAreaRect(largestContour);
+
+        // find and draw points for rectangle
+        // Point2f rectPoints[4];
+        // rect.points(rectPoints);
+        // Point2i intRectPoints[4];
+        // intRectPoints = static_cast<Point>(rectPoints);
+
+        // using boxPoints
+        boxPoints(rect, points);
+        // platform_log("Rotated Rect Points(FLOAT):/n bottomLeft: %d/n, topLeft: %d/n, topRight :%d/n, bottomRight: %dn", points[0], points[1], points[2], points[3]);
+        // vector<int> intPoints(points.begin(), points.end());
+        // points.convertTo(intPoints, CV_8S);
+        // transform(points.begin(), points.end(), intPoints.begin(), convertToInt);
+        // platform_log("Rotated Rect Points(INTEGER):/n bottomLeft: %d/n, topLeft: %d/n, topRight :%d/n, bottomRight: %dn", intPoints[0], intPoints[1], intPoints[2], intPoints[3]);
+        // Mat pointsMat = Mat(4, 2, CV_32SC1);
+        // pointsMat.push_back(intPoints);
+        Mat pointsMat = Mat(1, 2, CV_32S);
+        points.convertTo(intPoints, CV_32SC1);
+        pointsMat.push_back(intPoints);
+        
+        drawContours(input, pointsMat, -1, Scalar(0, 255, 0), 3);
+
+        imwrite(outputImagePath, input);
+    }
+
+    __attribute__((visibility("default"))) __attribute__((used))
+    class ShapeDetector {
+        public:
+            string detectShape(std::vector<Point> contour){
+                string shape = "unidentified";
+                vector<Point> approx;
+                approxPolyDP(contour, approx, 0.04 * arcLength(contour, true), true);
+                platform_log("Number of vertices: %d\n", approx.size());
+
+                if(approx.size() == 3){
+                    shape = "triangle";
+                } else if(approx.size() == 4){
+                    shape = "square or rectangle";
+                } else if(approx.size() == 5){
+                    shape = "pentagon";
+                } else {
+                    shape = "circle";
+                }
+
+                return shape;
+            }
+    };
+
+    __attribute__((visibility("default"))) __attribute__((used))
     void process_image(char* inputImagePath, char* outputImagePath) {
         long long start = get_now();
-        
-        Mat input = imread(inputImagePath, IMREAD_GRAYSCALE);
-        Mat threshed, withContours;
+
+        Mat input = imread(inputImagePath);
+
+        Mat input_gray = imread(inputImagePath, IMREAD_GRAYSCALE);
+        Mat threshed, withContours, blurred;
 
         vector<vector<Point>> contours;
         vector<Vec4i> hierarchy;
-        
-        adaptiveThreshold(input, threshed, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 77, 6);
-        findContours(threshed, contours, hierarchy, RETR_TREE, CHAIN_APPROX_TC89_L1);
-        
-        cvtColor(threshed, withContours, COLOR_GRAY2BGR);
-        drawContours(withContours, contours, -1, Scalar(0, 255, 0), 4);
-        
-        imwrite(outputImagePath, withContours);
+
+        // image preprocessing
+        // GaussianBlur(input, blurred, Size(5, 5), 0);
+        // threshold(blurred, threshed, 60, 255, THRESH_BINARY);
+        // findContours(threshed, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
+
+        // drawContours(threshed, contours, -1, Scalar(0, 255, 0), 4);
+
+        // ShapeDetector sd;
+        // for(int i = 0; i < contours.size(); i++){
+        //     string shape = sd.detectShape(contours[i]);
+        //     platform_log("Shape: %s\n", shape.c_str());
+        // }
+
+        // imwrite(outputImagePath, grad);
+        thresholdSegmentation(input, input_gray, outputImagePath);
         
         int evalInMillis = static_cast<int>(get_now() - start);
         platform_log("Processing done in %dms\n", evalInMillis);
